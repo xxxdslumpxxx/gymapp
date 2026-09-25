@@ -8,7 +8,8 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="manifest" href='data:application/manifest+json,{"name":"GymCounter Pro","short_name":"GymCounter","start_url":".","display":"fullscreen","orientation":"portrait","background_color":"#07090e","theme_color":"#07090e"}'>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="./icon-192.png">
   <style>
     :root {
       --bg: #07090e;
@@ -1562,6 +1563,13 @@
     });
 
     updateDisplayTime();
+
+    // Registrazione Service Worker per abilitare il tasto 'Installa app' su Android
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
   </script>
 </body>
 </html>
