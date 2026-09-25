@@ -593,9 +593,12 @@
     <div class="rep-card" id="repCard" onclick="openSettingsSection('reps')" style="cursor:pointer;" title="Tocca per impostare distanza laser mm, suono e voce ripetizioni">
       <div class="rep-meta">
         <div class="rep-meta-title">Ripetizioni Serie</div>
-        <div class="rep-meta-sub" id="repSub">Laser ToF: <span id="laserCurrentMm" style="color:var(--work)">150 mm</span></div>
+        <div class="rep-meta-sub" id="repSub" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:3px;">
+          <span>Laser: <strong id="laserCurrentMm" style="color:var(--work)">150 mm</strong></span>
+          <button id="quickSyncBtn" onclick="event.stopPropagation(); connectBleCustom();" style="background:#141824; border:1.5px solid #0096ff; color:#00b4ff; font-size:0.75rem; font-weight:800; padding:3px 8px; border-radius:8px; cursor:pointer;">📡 Sincronizza</button>
+        </div>
         <div style="font-size:0.75rem; color:var(--text-muted); font-weight:800; margin-top:4px; display:flex; align-items:center; gap:4px; opacity:0.85;">
-          <span>🎯 Tocca per laser & voce</span> <span>⚙️</span>
+          <span>🎯 Tocca per calibrare distanza</span> <span>⚙️</span>
         </div>
       </div>
       <div class="rep-number" id="repDisplay">0</div>
@@ -1083,6 +1086,21 @@
       }
     }
 
+    function updateSyncButtons(text, border, color) {
+      const b1 = document.getElementById("btnBleSync");
+      if (b1) {
+        if (text) b1.textContent = text;
+        if (border) b1.style.borderColor = border;
+        if (color) b1.style.color = color;
+      }
+      const b2 = document.getElementById("quickSyncBtn");
+      if (b2) {
+        if (text) b2.textContent = text.replace(" Sensore", "");
+        if (border) b2.style.borderColor = border;
+        if (color) b2.style.color = color;
+      }
+    }
+
     async function connectBleCustom() {
       if (!navigator.bluetooth) {
         const notice = document.getElementById("bleAppleNotice");
@@ -1093,8 +1111,7 @@
 
       try {
         updateBleSyncStatus("Ricerca 'GymCounter'...", "#00b4ff");
-        const btn = document.getElementById("btnBleSync");
-        btn.textContent = "⌛ Ricerca...";
+        updateSyncButtons("⌛ Ricerca...", "#00b4ff", "#00b4ff");
 
         bleDevice = await navigator.bluetooth.requestDevice({
           filters: [{ name: 'GymCounter' }],
@@ -1125,19 +1142,14 @@
           console.warn("Lettura soglia iniziale:", readErr);
         }
 
-        btn.textContent = "🟢 Connesso";
-        btn.style.borderColor = "var(--work)";
-        btn.style.color = "var(--work)";
+        updateSyncButtons("🟢 Connesso", "var(--work)", "var(--work)");
         updateBleSyncStatus(`🟢 Connesso! Distanza sensore: ${laserThresholdMm} mm`, "var(--work)");
 
         // Se l'utente desidera inviare il valore dello slider
         sendLaserThresholdToBle(laserThresholdMm);
       } catch (err) {
         console.error("BLE Connect Error:", err);
-        const btn = document.getElementById("btnBleSync");
-        btn.textContent = "📡 Sincronizza Sensore";
-        btn.style.borderColor = "#0096ff";
-        btn.style.color = "#00b4ff";
+        updateSyncButtons("📡 Sincronizza Sensore", "#0096ff", "#00b4ff");
         if (err.name !== 'NotFoundError') {
           updateBleSyncStatus("Errore: " + err.message, "var(--danger)");
         } else {
@@ -1149,12 +1161,7 @@
     function onBleCustomDisconnected() {
       bleSogliaChar = null;
       updateBleSyncStatus("Sensore disconnesso.", "var(--text-muted)");
-      const btn = document.getElementById("btnBleSync");
-      if (btn) {
-        btn.textContent = "📡 Sincronizza Sensore";
-        btn.style.borderColor = "#0096ff";
-        btn.style.color = "#00b4ff";
-      }
+      updateSyncButtons("📡 Sincronizza Sensore", "#0096ff", "#00b4ff");
     }
 
     async function sendLaserThresholdToBle(val) {
