@@ -623,16 +623,22 @@
 
       <!-- SEZIONE 1: Sensore Laser ToF -->
       <div class="laser-slider-box" id="sec-laser" style="border:1.5px solid var(--card-border); background:#0c0f17; padding:14px; border-radius:18px; transition:all 0.3s ease;">
-        <div style="font-size:0.95rem; font-weight:900; color:#fff; display:flex; align-items:center; gap:6px; margin-bottom:6px;">
-          <span>🎯</span> 1. SENSORE LASER ToF (MILLIMETRI)
+        <div style="font-size:0.95rem; font-weight:900; color:#fff; display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <span style="display:flex; align-items:center; gap:6px;"><span>🎯</span> 1. DISTANZA LASER (CALIBRAZIONE)</span>
+          <button id="btnBleSync" onclick="connectBleCustom()" style="background:#141824; border:1.5px solid #0096ff; color:#00b4ff; font-size:0.75rem; font-weight:800; padding:6px 12px; border-radius:12px; cursor:pointer; transition:all 0.2s ease;">📡 Sincronizza Sensore</button>
         </div>
-        <div style="display:flex; justify-content:space-between; font-weight:800; font-size:1rem;">
+        <div style="display:flex; justify-content:space-between; font-weight:800; font-size:1rem; margin-top:2px;">
           <span>Soglia di Scatto:</span>
           <span id="sliderValueText" style="color:var(--work); font-size:1.25rem;">150 mm</span>
         </div>
-        <input type="range" id="laserThresholdSlider" min="50" max="400" step="10" value="150" oninput="updateLaserThreshold(this.value)">
-        <div style="font-size:0.75rem; color:var(--text-muted);">
-          Scatta la ripetizione quando il pacco pesi oltrepassa questa distanza dal sensore.
+        <input type="range" id="laserThresholdSlider" min="50" max="400" step="10" value="150" oninput="updateLaserThreshold(this.value)" onchange="sendLaserThresholdToBle(this.value)">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
+          <span style="font-size:0.75rem; color:var(--text-muted);">50 mm</span>
+          <span id="bleSyncStatus" style="font-size:0.75rem; color:#8e9bb0; text-align:center; font-weight:700;">Scatta quando il peso supera questa distanza</span>
+          <span style="font-size:0.75rem; color:var(--text-muted);">400 mm</span>
+        </div>
+        <div id="bleAppleNotice" style="display:none; font-size:0.72rem; color:#ffaa00; background:rgba(255,170,0,0.1); border:1px solid rgba(255,170,0,0.3); padding:8px; border-radius:10px; margin-top:8px;">
+          ℹ️ <b>Nota Apple iOS:</b> Apple blocca il Web Bluetooth in Safari. Su iPhone puoi calibrare usando il browser gratuito <b>Bluefy</b>, oppure calibrare da PC/Android (il valore resta memorizzato nell'ESP32 anche spento!).
         </div>
       </div>
 
@@ -1062,15 +1068,127 @@
       }
     }
 
-    // ── GESTIONE SOGLIA LASER ──────────────────────────────────
+    // ── GESTIONE SOGLIA LASER & SINCRONIZZAZIONE BLE GATT ──────────
+    const BLE_SERVICE_UUID = '0000ffe0-0000-1000-8000-00805f9b34fb';
+    const BLE_CHAR_UUID    = '0000ffe1-0000-1000-8000-00805f9b34fb';
+    let bleDevice = null;
+    let bleSogliaChar = null;
+    let bleSyncTimer = null;
+
+    function updateBleSyncStatus(msg, color) {
+      const el = document.getElementById("bleSyncStatus");
+      if (el) {
+        el.textContent = msg;
+        if (color) el.style.color = color;
+      }
+    }
+
+    async function connectBleCustom() {
+      if (!navigator.bluetooth) {
+        const notice = document.getElementById("bleAppleNotice");
+        if (notice) notice.style.display = "block";
+        alert("Web Bluetooth non disponibile in questo browser.\n\n• Su Android/PC: usa Google Chrome su HTTPS.\n• Su Apple iOS: Safari non supporta Web Bluetooth. Usa l'app gratuita 'Bluefy' dall'App Store per calibrare, oppure regolalo una volta da Android/PC (il valore resta memorizzato nel sensore anche spento!).");
+        return;
+      }
+
+      try {
+        updateBleSyncStatus("Ricerca 'GymCounter'...", "#00b4ff");
+        const btn = document.getElementById("btnBleSync");
+        btn.textContent = "⌛ Ricerca...";
+
+        bleDevice = await navigator.bluetooth.requestDevice({
+          filters: [{ name: 'GymCounter' }],
+          optionalServices: [BLE_SERVICE_UUID]
+        });
+
+        bleDevice.addEventListener('gattserverdisconnected', onBleCustomDisconnected);
+
+        updateBleSyncStatus("Connessione in corso...", "#00b4ff");
+        const server = await bleDevice.gatt.connect();
+        const service = await server.getPrimaryService(BLE_SERVICE_UUID);
+        bleSogliaChar = await service.getCharacteristic(BLE_CHAR_UUID);
+
+        // Legge la distanza memorizzata al momento sul sensore
+        try {
+          const valData = await bleSogliaChar.readValue();
+          const decoder = new TextDecoder('utf-8');
+          const strVal = decoder.decode(valData).trim();
+          const numVal = parseInt(strVal, 10);
+          if (!isNaN(numVal) && numVal >= 40 && numVal <= 800) {
+            laserThresholdMm = numVal;
+            document.getElementById("laserThresholdSlider").value = numVal;
+            document.getElementById("sliderValueText").textContent = numVal + " mm";
+            document.getElementById("laserCurrentMm").textContent = numVal + " mm";
+            localStorage.setItem("gym_laser_mm", numVal);
+          }
+        } catch (readErr) {
+          console.warn("Lettura soglia iniziale:", readErr);
+        }
+
+        btn.textContent = "🟢 Connesso";
+        btn.style.borderColor = "var(--work)";
+        btn.style.color = "var(--work)";
+        updateBleSyncStatus(`🟢 Connesso! Distanza sensore: ${laserThresholdMm} mm`, "var(--work)");
+
+        // Se l'utente desidera inviare il valore dello slider
+        sendLaserThresholdToBle(laserThresholdMm);
+      } catch (err) {
+        console.error("BLE Connect Error:", err);
+        const btn = document.getElementById("btnBleSync");
+        btn.textContent = "📡 Sincronizza Sensore";
+        btn.style.borderColor = "#0096ff";
+        btn.style.color = "#00b4ff";
+        if (err.name !== 'NotFoundError') {
+          updateBleSyncStatus("Errore: " + err.message, "var(--danger)");
+        } else {
+          updateBleSyncStatus("Connessione annullata.", "var(--text-muted)");
+        }
+      }
+    }
+
+    function onBleCustomDisconnected() {
+      bleSogliaChar = null;
+      updateBleSyncStatus("Sensore disconnesso.", "var(--text-muted)");
+      const btn = document.getElementById("btnBleSync");
+      if (btn) {
+        btn.textContent = "📡 Sincronizza Sensore";
+        btn.style.borderColor = "#0096ff";
+        btn.style.color = "#00b4ff";
+      }
+    }
+
+    async function sendLaserThresholdToBle(val) {
+      if (!bleSogliaChar) return;
+      try {
+        clearTimeout(bleSyncTimer);
+        bleSyncTimer = setTimeout(async () => {
+          if (!bleSogliaChar) return;
+          const encoder = new TextEncoder();
+          const data = encoder.encode(val.toString());
+          if (bleSogliaChar.writeValueWithResponse) {
+            await bleSogliaChar.writeValueWithResponse(data);
+          } else {
+            await bleSogliaChar.writeValue(data);
+          }
+          updateBleSyncStatus(`✅ Salvato nel sensore: ${val} mm!`, "var(--work)");
+        }, 120);
+      } catch (err) {
+        console.warn("Errore scrittura BLE:", err);
+        updateBleSyncStatus("Errore invio al sensore.", "var(--danger)");
+      }
+    }
+
     function updateLaserThreshold(val) {
       laserThresholdMm = val;
       document.getElementById("sliderValueText").textContent = val + " mm";
       document.getElementById("laserCurrentMm").textContent = val + " mm";
       localStorage.setItem("gym_laser_mm", val);
+      if (bleSogliaChar) {
+        sendLaserThresholdToBle(val);
+      }
     }
 
-    // Carica soglia salvata
+    // Carica soglia salvata localmente
     const savedMm = localStorage.getItem("gym_laser_mm");
     if (savedMm) {
       document.getElementById("laserThresholdSlider").value = savedMm;
