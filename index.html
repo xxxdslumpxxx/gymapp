@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>GymCounter - Pro Workout</title>
+  <meta name="theme-color" content="#07090e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href='data:application/manifest+json,{"name":"GymCounter Pro","short_name":"GymCounter","start_url":".","display":"fullscreen","orientation":"portrait","background_color":"#07090e","theme_color":"#07090e"}'>
+  <style>
+    :root {
+      --bg: #07090e;
+      --card-bg: #10141f;
+      --card-border: #1d2538;
+      --work: #00ff88;
+      --work-glow: rgba(0, 255, 136, 0.4);
+      --rest: #ff8800;
+      --rest-glow: rgba(255, 136, 0, 0.4);
+      --danger: #ff3344;
+      --text: #ffffff;
+      --text-muted: #8e9bb0;
+    }
+
+    @keyframes pulseHighlight {
+      0% { border-color: var(--card-border); box-shadow: none; transform: scale(1); }
+      30% { border-color: var(--work); box-shadow: 0 0 25px var(--work-glow); transform: scale(1.02); }
+      70% { border-color: var(--work); box-shadow: 0 0 25px var(--work-glow); transform: scale(1.02); }
+      100% { border-color: var(--card-border); box-shadow: none; transform: scale(1); }
+    }
+    .section-highlight {
+      animation: pulseHighlight 1.5s ease !important;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      padding: 10px 14px;
+      overflow-y: auto;
+    }
+
+    /* Header con Tasti Sempre Visibili in Alto */
+    header {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--card-border);
+      flex-shrink: 0;
+      gap: 6px;
+    }
+
+    .header-row-1 {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-row-2 {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .brand {
+      font-weight: 900;
+      font-size: 1.15rem;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex-shrink: 1;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    /* Badge Connessione Immediato e Riconoscibile */
+    .connection-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      background: #141824;
+      border: 1.5px solid #232d42;
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .connection-badge.connected {
+      background: rgba(0, 255, 136, 0.15);
+      border-color: var(--work);
+      color: var(--work);
+      box-shadow: 0 0 12px var(--work-glow);
+    }
+
+    .connection-badge.ready {
+      background: rgba(0, 150, 255, 0.15);
+      border-color: #0096ff;
+      color: #00b4ff;
+    }
+
+    .icon-btn {
+      background: #182030;
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      border-radius: 12px;
+      width: 40px;
+      height: 40px;
+      font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .icon-btn:active {
+      transform: scale(0.92);
+    }
+
+    /* Dashboard Principale */
+    main {
+      width: 100%;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 10px 0;
+      justify-content: space-evenly;
+    }
+
+    /* Card Timer Ciclico */
+    .interval-card {
+      width: 100%;
+      background: var(--card-bg);
+      border: 2px solid var(--card-border);
+      border-radius: 22px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      transition: all 0.25s ease;
+    }
+
+    .interval-card.work-phase {
+      border-color: var(--work);
+      box-shadow: inset 0 0 20px rgba(0, 255, 136, 0.08), 0 0 25px var(--work-glow);
+    }
+
+    .interval-card.rest-phase {
+      border-color: var(--rest);
+      box-shadow: inset 0 0 20px rgba(255, 136, 0, 0.08), 0 0 25px var(--rest-glow);
+    }
+
+    .card-top-row {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Scritte Molto Più Grandi e Chiare */
+    .phase-badge {
+      font-size: 1.15rem;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 6px 18px;
+      border-radius: 10px;
+      background: #171d2b;
+      color: var(--text-muted);
+    }
+
+    .work-phase .phase-badge { background: var(--work); color: #000; }
+    .rest-phase .phase-badge { background: var(--rest); color: #000; }
+
+    .series-counter {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--text-muted);
+    }
+
+    .series-counter span {
+      color: #fff;
+      font-size: 1.4rem;
+      font-weight: 900;
+    }
+
+    .interval-time {
+      font-size: 5.2rem;
+      font-weight: 900;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      margin: 8px 0;
+      color: var(--text);
+    }
+
+    .work-phase .interval-time {
+      color: var(--work);
+      text-shadow: 0 0 25px var(--work-glow);
+    }
+
+    .rest-phase .interval-time {
+      color: var(--rest);
+      text-shadow: 0 0 25px var(--rest-glow);
+    }
+
+    .card-bottom-info {
+      font-size: 1.05rem;
+      color: var(--text-muted);
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+
+    .card-bottom-info span {
+      font-weight: 900;
+    }
+
+    /* Card Ripetizioni Densa e con Scritte Grandi */
+    .rep-card {
+      width: 100%;
+      background: var(--card-bg);
+      border: 2px solid var(--card-border);
+      border-radius: 22px;
+      padding: 14px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.15s ease;
+    }
+
+    .rep-card.hit {
+      border-color: var(--work);
+      background: #14241e;
+      transform: scale(1.02);
+      box-shadow: 0 0 25px var(--work-glow);
+    }
+
+    .rep-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .rep-meta-title {
+      font-size: 1.15rem;
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: #ffffff;
+      text-transform: uppercase;
+    }
+
+    .rep-meta-sub {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    .rep-number {
+      font-size: 5.8rem;
+      font-weight: 900;
+      line-height: 1;
+      color: var(--work);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Barra Controlli Rapidi */
+    .controls-row {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 10px;
+    }
+
+    .btn {
+      background: #151a26;
+      color: var(--text);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 14px;
+      font-weight: 900;
+      font-size: 1.05rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.15s;
+    }
+
+    .btn:active { transform: scale(0.96); }
+
+    .btn-start {
+      background: var(--work);
+      color: #000;
+      border: none;
+      box-shadow: 0 4px 18px var(--work-glow);
+    }
+
+    .btn-pause {
+      background: var(--rest);
+      color: #000;
+      border: none;
+      box-shadow: 0 4px 18px var(--rest-glow);
+    }
+
+    .btn-reset {
+      color: var(--danger);
+      border-color: rgba(255, 51, 68, 0.4);
+    }
+
+    /* Modal Impostazioni Avanzate */
+    .settings-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.88);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .settings-modal.open {
+      display: flex;
+    }
+
+    .settings-content {
+      width: 100%;
+      max-width: 460px;
+      max-height: 90vh;
+      overflow-y: auto;
+      background: var(--card-bg);
+      border: 2px solid var(--card-border);
+      border-radius: 24px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .settings-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 10px;
+    }
+
+    .settings-title {
+      font-size: 1.2rem;
+      font-weight: 900;
+    }
+
+    .close-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.8rem;
+      cursor: pointer;
+    }
+
+    .setting-item {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .setting-item-label {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #ffffff;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .time-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .time-input-box {
+      background: #090c12;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .time-input-box span {
+      font-size: 0.85rem;
+      font-weight: 800;
+    }
+
+    .time-input-box input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 1.6rem;
+      font-weight: 900;
+      text-align: center;
+      outline: none;
+    }
+
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #090c12;
+      border: 1px solid var(--card-border);
+      padding: 12px 14px;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    .toggle-row input[type="checkbox"] {
+      width: 22px;
+      height: 22px;
+      accent-color: var(--work);
+      cursor: pointer;
+    }
+
+    select {
+      background: #090c12;
+      border: 1.5px solid var(--card-border);
+      color: #fff;
+      padding: 12px 10px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      outline: none;
+      width: 100%;
+      cursor: pointer;
+      user-select: auto;
+      -webkit-user-select: auto;
+      pointer-events: auto;
+      -webkit-appearance: menulist;
+      appearance: menulist;
+    }
+
+    input[type="range"] {
+      background: #090c12;
+      border: 1px solid var(--card-border);
+      color: #fff;
+      padding: 10px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      outline: none;
+      width: 100%;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
+    .preview-btn {
+      background: #182030;
+      border: 1px solid var(--card-border);
+      color: var(--work);
+      font-weight: 800;
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      align-self: flex-start;
+    }
+
+    .laser-slider-box {
+      background: #090c12;
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Video invisibile per WakeLock garantito su Android anche da file:/// -->
+  <video id="noSleepVideo" playsinline loop muted style="position:absolute; opacity:0.001; pointer-events:none; width:1px; height:1px;"></video>
+
+  <!-- Input invisibile per compatibilità cattura tasti Bluetooth su Apple iOS Safari -->
+  <input type="text" id="iosKeyCapturer" inputmode="none" style="position:fixed; top:-999px; left:-999px; width:1px; height:1px; opacity:0.001; pointer-events:none;" aria-hidden="true">
+
+  <!-- Header Sempre Visibile (Layout 2 Righe Anti-Taglio per Schermo Verticale) -->
+  <header>
+    <!-- Riga 1: Titolo e Pulsanti Azione (Sempre a destra in alto) -->
+    <div class="header-row-1">
+      <div class="brand">
+        <span>⚡ GymCounter</span>
+      </div>
+
+      <div class="header-actions">
+        <!-- Tasto Storico Allenamenti -->
+        <button class="icon-btn" onclick="openHistory()" title="Storico Allenamento" aria-label="Storico">
+          <span>📊</span>
+        </button>
+
+        <!-- Tasto Impostazioni -->
+        <button class="icon-btn" onclick="openSettings()" title="Impostazioni" aria-label="Impostazioni">
+          <span>⚙️</span>
+        </button>
+
+        <!-- Tasto Schermo Intero PWA -->
+        <button class="icon-btn" onclick="toggleFullScreen()" title="Tutto Schermo" aria-label="Tutto Schermo">
+          <span>⛶</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Riga 2: Indicatori Stato (Bluetooth e Display) -->
+    <div class="header-row-2">
+      <!-- Badge Connessione con Watchdog Dinamico -->
+      <div class="connection-badge ready" id="connBadge" onclick="showBleInfoAlert()" style="flex:1; justify-content:center; overflow:hidden; text-overflow:ellipsis; cursor:pointer;" title="Tocca per info sulla connessione Bluetooth">
+        <span id="connIcon">📶</span>
+        <span id="connText">IN ATTESA DI SEGNALE</span>
+      </div>
+
+      <!-- Indicatore Display Sempre Acceso -->
+      <div class="connection-badge ready" id="wakePill" onclick="requestWakeLock()" title="Tocca per riattivare NoSleep" style="color:#00b4ff;">
+        <span id="wakeIcon">👁️</span>
+        <span id="wakeText">DISPLAY ON</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Dashboard Principale Ben Ripartita -->
+  <main>
+
+    <!-- Card Timer Ciclico: Clicca per aprire direttamente impostazioni Timer -->
+    <div class="interval-card" id="intervalCard" onclick="openSettingsSection('timer')" style="cursor:pointer;" title="Tocca per impostare tempi di lavoro, recupero e countdown">
+      <div class="card-top-row">
+        <div class="phase-badge" id="phaseBadge">PRONTO</div>
+        <div class="series-counter">
+          SERIE: <span id="currentSet">1</span>
+        </div>
+      </div>
+
+      <div class="interval-time" id="timeDisplay">00:40</div>
+
+      <div class="card-bottom-info">
+        ESERCIZIO: <span id="infoWork" style="color:var(--work)">40s</span> | RECUPERO: <span id="infoRest" style="color:var(--rest)">60s</span>
+      </div>
+
+      <div style="font-size:0.75rem; color:var(--text-muted); font-weight:800; margin-top:6px; display:flex; align-items:center; gap:4px; opacity:0.85;">
+        <span>⏱️ Tocca per impostare i tempi</span> <span>⚙️</span>
+      </div>
+    </div>
+
+    <!-- Card Ripetizioni: Clicca per aprire direttamente impostazioni Laser, Voce e Suoni -->
+    <div class="rep-card" id="repCard" onclick="openSettingsSection('reps')" style="cursor:pointer;" title="Tocca per impostare distanza laser mm, suono e voce ripetizioni">
+      <div class="rep-meta">
+        <div class="rep-meta-title">Ripetizioni Serie</div>
+        <div class="rep-meta-sub" id="repSub">Laser ToF: <span id="laserCurrentMm" style="color:var(--work)">150 mm</span></div>
+        <div style="font-size:0.75rem; color:var(--text-muted); font-weight:800; margin-top:4px; display:flex; align-items:center; gap:4px; opacity:0.85;">
+          <span>🎯 Tocca per laser & voce</span> <span>⚙️</span>
+        </div>
+      </div>
+      <div class="rep-number" id="repDisplay">0</div>
+    </div>
+
+    <!-- Controlli Rapidi Grandi -->
+    <div class="controls-row">
+      <button class="btn btn-start" id="startBtn" onclick="toggleIntervalTimer()">
+        <span id="startIcon">▶️</span> <span id="startText">AVVIA TIMER</span>
+      </button>
+      <button class="btn btn-reset" onclick="resetAll()">
+        <span>⏹️</span> STOP
+      </button>
+    </div>
+
+  </main>
+
+  <!-- Modal 1: Impostazioni con Sezioni Grafiche Distinte -->
+  <div class="settings-modal" id="settingsModal">
+    <div class="settings-content">
+      <div class="settings-header">
+        <div class="settings-title">⚙️ Impostazioni Workout</div>
+        <button class="close-btn" onclick="closeSettings()">&times;</button>
+      </div>
+
+      <!-- SEZIONE 1: Sensore Laser ToF -->
+      <div class="laser-slider-box" id="sec-laser" style="border:1.5px solid var(--card-border); background:#0c0f17; padding:14px; border-radius:18px; transition:all 0.3s ease;">
+        <div style="font-size:0.95rem; font-weight:900; color:#fff; display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+          <span>🎯</span> 1. SENSORE LASER ToF (MILLIMETRI)
+        </div>
+        <div style="display:flex; justify-content:space-between; font-weight:800; font-size:1rem;">
+          <span>Soglia di Scatto:</span>
+          <span id="sliderValueText" style="color:var(--work); font-size:1.25rem;">150 mm</span>
+        </div>
+        <input type="range" id="laserThresholdSlider" min="50" max="400" step="10" value="150" oninput="updateLaserThreshold(this.value)">
+        <div style="font-size:0.75rem; color:var(--text-muted);">
+          Scatta la ripetizione quando il pacco pesi oltrepassa questa distanza dal sensore.
+        </div>
+      </div>
+
+      <!-- SEZIONE 2: Timer Ciclico & Countdown -->
+      <div class="laser-slider-box" id="sec-timer" style="border:1.5px solid var(--card-border); background:#0c0f17; padding:14px; border-radius:18px; transition:all 0.3s ease;">
+        <div style="font-size:0.95rem; font-weight:900; color:#fff; display:flex; align-items:center; gap:6px; margin-bottom:8px;">
+          <span>⏱️</span> 2. TIMER CICLICO & PREAVVISO
+        </div>
+        <div class="time-grid">
+          <div class="time-input-box">
+            <span style="color:var(--work)">💪 Lavoro (s)</span>
+            <input type="number" id="workSeconds" value="40" min="5" max="600" onchange="updateTimes()">
+          </div>
+          <div class="time-input-box">
+            <span style="color:var(--rest)">⏸️ Riposo (s)</span>
+            <input type="number" id="restSeconds" value="60" min="5" max="600" onchange="updateTimes()">
+          </div>
+        </div>
+
+        <div style="margin-top:10px;">
+          <div style="font-size:0.85rem; font-weight:800; margin-bottom:4px; color:var(--text-muted);">Da quanti secondi far partire il countdown:</div>
+          <select id="countdownWarningSelect" onchange="countdownStartSec = parseInt(this.value)">
+            <option value="3">Ultimi 3 Secondi (3..2..1..0)</option>
+            <option value="5" selected>Ultimi 5 Secondi (5..4..3..2..1..0)</option>
+            <option value="8">Ultimi 8 Secondi (8..7..6..)</option>
+            <option value="10">Ultimi 10 Secondi</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- SEZIONE 3: Suoni & Sintesi Vocale -->
+      <div class="laser-slider-box" id="sec-sound" style="border:1.5px solid var(--card-border); background:#0c0f17; padding:14px; border-radius:18px; transition:all 0.3s ease;">
+        <div style="font-size:0.95rem; font-weight:900; color:#fff; display:flex; align-items:center; gap:6px; margin-bottom:8px;">
+          <span>🔊</span> 3. SUONI & SINTESI VOCALE
+        </div>
+
+        <div>
+          <div style="font-size:0.85rem; font-weight:800; margin-bottom:4px; color:var(--text-muted);">Effetto Sonoro Ripetizione:</div>
+          <select id="soundSelect" onchange="selectedSound = this.value; playCurrentRepSound();">
+            <option value="laser" selected>⚡ Laser Sci-Fi</option>
+            <option value="beep">🔔 Beep Acuto Sportivo</option>
+            <option value="bell">🛎️ Campanella / Ding</option>
+            <option value="click">🔨 Click Meccanico</option>
+            <option value="bass">🔊 Bip Basso Morbido</option>
+          </select>
+        </div>
+        <button class="preview-btn" onclick="playCurrentRepSound()" style="margin-top:6px;">🔊 Prova Suono</button>
+
+        <div class="toggle-row" style="margin-top:10px;">
+          <span>Voce scandisce Countdown (5..1)</span>
+          <input type="checkbox" id="voiceCountdownToggle" checked>
+        </div>
+        <div class="toggle-row" style="margin-top:6px;">
+          <span>Voce conta Ripetizioni (1..2..)</span>
+          <input type="checkbox" id="voiceRepsToggle">
+        </div>
+      </div>
+
+      <!-- SEZIONE 4: Schermo Sempre Acceso -->
+      <div class="laser-slider-box" id="sec-screen" style="border:1.5px solid var(--card-border); background:#0c0f17; padding:14px; border-radius:18px; transition:all 0.3s ease;">
+        <div style="font-size:0.95rem; font-weight:900; color:#fff; display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+          <span>👁️</span> 4. DISPLAY SEMPRE ACCESO (NO SLEEP)
+        </div>
+        <div class="toggle-row">
+          <span>Schermo sempre attivo durante il workout</span>
+          <input type="checkbox" id="wakeLockToggle" checked onchange="toggleWakeLockSetting(this.checked)">
+        </div>
+        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
+          Mantiene il display del telefono sempre acceso durante l'allenamento.
+        </div>
+      </div>
+
+      <!-- SEZIONE 5: Tasto Bluetooth -->
+      <div class="laser-slider-box" id="sec-key" style="border:1.5px solid var(--card-border); background:#0c0f17; padding:14px; border-radius:18px; transition:all 0.3s ease;">
+        <div style="font-size:0.95rem; font-weight:900; color:#fff; display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+          <span>⌨️</span> 5. TASTO RICEVUTO DA ESP32
+        </div>
+        <select id="keySelect" onchange="triggerKey = this.value">
+          <option value="+" selected>+ (Tastierino / Default GymCounter)</option>
+          <option value=" ">Spazio (Spacebar)</option>
+          <option value="Enter">Invio (Enter)</option>
+        </select>
+      </div>
+
+      <button class="btn btn-start" style="margin-top:6px;" onclick="closeSettings()">
+        <span>💾</span> Salva Impostazioni
+      </button>
+    </div>
+  </div>
+
+  <!-- Modal 2: Storico Allenamenti Permanente -->
+  <div class="settings-modal" id="historyModal">
+    <div class="settings-content">
+      <div class="settings-header">
+        <div class="settings-title">📊 Storico Serie Registrate</div>
+        <button class="close-btn" onclick="closeHistory()">&times;</button>
+      </div>
+
+      <!-- Statistiche Totali -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div style="background:#090c12; border:1px solid var(--card-border); border-radius:14px; padding:12px; display:flex; flex-direction:column; align-items:center;">
+          <div style="font-size:2.2rem; font-weight:900; color:var(--work);" id="histTotalReps">0</div>
+          <div style="font-size:0.75rem; font-weight:800; color:var(--text-muted); text-transform:uppercase;">Ripetizioni Totali</div>
+        </div>
+        <div style="background:#090c12; border:1px solid var(--card-border); border-radius:14px; padding:12px; display:flex; flex-direction:column; align-items:center;">
+          <div style="font-size:2.2rem; font-weight:900; color:#00b4ff;" id="histTotalSets">0</div>
+          <div style="font-size:0.75rem; font-weight:800; color:var(--text-muted); text-transform:uppercase;">Serie Completate</div>
+        </div>
+      </div>
+
+      <div style="font-size:0.85rem; font-weight:800; color:var(--text-muted); margin-top:4px;">
+        CRONOLOGIA SERIE SALVATE:
+      </div>
+
+      <!-- Lista Serie Registrate -->
+      <div id="historyListContainer" style="display:flex; flex-direction:column; gap:8px; max-height:40vh; overflow-y:auto;">
+        <!-- Inserite dinamicamente via JS -->
+      </div>
+
+      <div style="display:flex; gap:10px; margin-top:8px;">
+        <button class="btn btn-reset" style="flex:1" onclick="clearHistory()">
+          <span>🗑️</span> Svuota
+        </button>
+        <button class="btn btn-start" style="flex:1" onclick="closeHistory()">
+          <span>Chiudi</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── STATO WORKOUT ──────────────────────────────────────────
+    let workDuration = 40;
+    let restDuration = 60;
+    let timeLeft = 40;
+    let currentPhase = "idle";
+    let timerInterval = null;
+    let setNumber = 1;
+    let repsInSet = 0;
+
+    let countdownStartSec = 5; // Da quanti secondi far partire il countdown sonoro
+    let triggerKey = "+";
+    let selectedSound = "laser";
+    let laserThresholdMm = 150;
+    let wakeLock = null;
+
+    // Tracciamento temporale delle ripetizioni per decimi di secondo
+    let currentSetRepTimings = [];
+    let setStartTimestamp = 0;
+    let lastSetEndTimestamp = 0;
+
+    // ── SCHERMO SEMPRE ACCESO (WAKE LOCK + LIVE CANVAS STREAM + MP4 FALLBACK) ──
+    let keepDisplayAwake = true;
+    let silentAudioSource = null;
+    let wakeCanvas = null;
+    let wakeCanvasInterval = null;
+
+    // Micro video MP4 reale in Base64 (1 secondo muto in loop continuo)
+    const NO_SLEEP_SRC = "data:video/mp4;base64,AAAAHGZ0eXBtcDQyAAAAAW1wNDJpc29tAAAAKm1vb3YAAABsbXZoZAAAAAB2o0bvdqNG7wAAA+gAAAAAAAEAAAEAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAABidHJhawAAAFx0a2hkAAAAB3ajRu92o0bvAAAAAQAAAAEAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJbWRpYQAAACRtaGRyAAAAAHajRu92o0bvAAAPoAAAA+gAAAAAAAAAAAAAACFoZGxyAAAAAAAAAAB2aWRlAAAAAAAAAAAAAAAAR3JhcGhpY3MAAAABV21pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAPNzdGJsAAAAp3N0c2QAAAAAAAAAAQAAAJdhdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAEAAQASAAAAEgAAABAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABj//wAAACNhdnNDAAAAAH4AAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFHN0dHMAAAAAAAAAAQAAAAEAAAAAAAEAAAAYc3RzYwAAAAAAAAABAAAAAQAAAAEAAAABAAAAFHN0c3oAAAAAAAAAAAAAAAEAAAAFc3RjbwAAAAAAAAABAAAALAAAAANtZGF0AAAAABg=";
+
+    // Metodo 1: Canvas animato catturato in live MediaStream (impedisce al sistema operativo Android di spegnere lo schermo)
+    function initCanvasWakeLock() {
+      const video = document.getElementById("noSleepVideo");
+      if (!video) return;
+
+      try {
+        if (!wakeCanvas) {
+          wakeCanvas = document.createElement("canvas");
+          wakeCanvas.width = 16;
+          wakeCanvas.height = 16;
+          const ctx = wakeCanvas.getContext("2d");
+          let toggle = false;
+
+          wakeCanvasInterval = setInterval(() => {
+            if (!keepDisplayAwake) return;
+            toggle = !toggle;
+            ctx.fillStyle = toggle ? "#000000" : "#080808";
+            ctx.fillRect(0, 0, 16, 16);
+          }, 600);
+
+          if (wakeCanvas.captureStream) {
+            const stream = wakeCanvas.captureStream(2);
+            video.srcObject = stream;
+            video.play().then(() => {
+              updateWakeIndicator(true);
+            }).catch(() => {
+              initNoSleepFallback();
+            });
+            return;
+          }
+        }
+      } catch (e) {
+        initNoSleepFallback();
+      }
+    }
+
+    // Metodo 2: Video MP4 Base64 con listener attivo
+    function initNoSleepFallback() {
+      const video = document.getElementById("noSleepVideo");
+      if (!video) return;
+      if (!video.src || video.src === "" || video.src === window.location.href) {
+        video.src = NO_SLEEP_SRC;
+      }
+      video.play().then(() => {
+        updateWakeIndicator(true);
+      }).catch(() => {
+        updateWakeIndicator(false);
+      });
+    }
+
+    // Metodo 3: Oscillatore inudibile su Web Audio Context
+    function keepAudioPipelineAlive() {
+      try {
+        const ctx = getAudioCtx();
+        if (!silentAudioSource) {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          gain.gain.value = 0.0001; // Inudibile
+          osc.frequency.value = 40;
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          silentAudioSource = osc;
+        }
+      } catch (e) {}
+    }
+
+    // Funzione unificata per mantenere il display attivo
+    async function requestWakeLock() {
+      if (!keepDisplayAwake) return;
+
+      // Avvia pipeline continua canvas + video
+      initCanvasWakeLock();
+      keepAudioPipelineAlive();
+
+      // Prova anche Screen Wake Lock API del browser se disponibile
+      try {
+        if ('wakeLock' in navigator) {
+          if (!wakeLock || wakeLock.released) {
+            wakeLock = await navigator.wakeLock.request('screen');
+            wakeLock.addEventListener('release', () => {
+              if (keepDisplayAwake) {
+                // Riprova ad acquisire se rilasciato da cambio finestra
+                setTimeout(requestWakeLock, 1000);
+              }
+            });
+          }
+          updateWakeIndicator(true);
+        }
+      } catch (err) {
+        // Fallback canvas/video garantisce comunque lo schermo acceso
+        updateWakeIndicator(true);
+      }
+    }
+
+    function updateWakeIndicator(active) {
+      const pill = document.getElementById("wakePill");
+      const icon = document.getElementById("wakeIcon");
+      const text = document.getElementById("wakeText");
+      if (pill) {
+        if (active) {
+          pill.style.borderColor = "var(--work)";
+          pill.style.color = "var(--work)";
+          if (icon) icon.textContent = "👁️";
+          if (text) text.textContent = "SCHERMO ON";
+        } else {
+          pill.style.borderColor = "var(--card-border)";
+          pill.style.color = "var(--text-muted)";
+          if (text) text.textContent = "TOCCA X WAKE";
+        }
+      }
+    }
+
+    function toggleWakeLockSetting(enabled) {
+      keepDisplayAwake = enabled;
+      if (enabled) {
+        requestWakeLock();
+      } else {
+        if (wakeLock) { wakeLock.release(); wakeLock = null; }
+        const video = document.getElementById("noSleepVideo");
+        if (video) {
+          video.pause();
+          video.srcObject = null;
+        }
+        if (wakeCanvasInterval) clearInterval(wakeCanvasInterval);
+        wakeCanvas = null;
+        updateWakeIndicator(false);
+      }
+    }
+
+    // ── STORICO SERIE PERMANENTE CON SECONDI E DECIMI ──────────
+    function getStoredHistory() {
+      try {
+        const data = localStorage.getItem("gym_workout_history");
+        return data ? JSON.parse(data) : [];
+      } catch (e) { return []; }
+    }
+
+    function saveSetToHistory(repsDone, durationSec) {
+      if (repsDone === 0 && durationSec < 3) return;
+
+      const now = Date.now();
+      const history = getStoredHistory();
+      const nowDate = new Date(now);
+      const dateStr = nowDate.toLocaleDateString("it-IT", { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const timeStr = nowDate.toLocaleTimeString("it-IT", { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      // Calcola il tempo di recupero tra questa serie e la precedente in secondi e decimi (0.1s)
+      const effectiveStart = setStartTimestamp > 0 ? setStartTimestamp : (now - durationSec * 1000);
+      let restFromPrevious = null;
+      if (lastSetEndTimestamp > 0 && effectiveStart >= lastSetEndTimestamp) {
+        restFromPrevious = ((effectiveStart - lastSetEndTimestamp) / 1000).toFixed(1);
+      }
+      lastSetEndTimestamp = now;
+      setStartTimestamp = 0;
+
+      // Calcola gli intervalli in secondi e decimi tra ogni singola ripetizione
+      let intervals = [];
+      for (let i = 1; i < currentSetRepTimings.length; i++) {
+        let diff = ((currentSetRepTimings[i] - currentSetRepTimings[i - 1]) / 1000).toFixed(1);
+        intervals.push(diff);
+      }
+
+      // Cadenza media (secondi e decimi per colpo)
+      let avgPace = (repsDone > 0 && durationSec > 0) ? (durationSec / repsDone).toFixed(1) : "0.0";
+
+      history.unshift({
+        id: now,
+        date: dateStr,
+        time: timeStr,
+        set: setNumber,
+        reps: repsDone,
+        duration: durationSec,
+        restFromPrevious: restFromPrevious,
+        intervals: intervals,
+        avgPace: avgPace
+      });
+
+      if (history.length > 200) history.pop();
+      localStorage.setItem("gym_workout_history", JSON.stringify(history));
+
+      // Resetta i tempi per la prossima serie
+      currentSetRepTimings = [];
+    }
+
+    function renderHistoryUI() {
+      const history = getStoredHistory();
+      const list = document.getElementById("historyListContainer");
+      list.innerHTML = "";
+
+      let totReps = 0;
+      history.forEach(item => totReps += (item.reps || 0));
+
+      document.getElementById("histTotalReps").textContent = totReps;
+      document.getElementById("histTotalSets").textContent = history.length;
+
+      if (history.length === 0) {
+        list.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted); font-weight:700;">Nessuna serie registrata ancora.<br>Avvia il timer e allenati!</div>`;
+        return;
+      }
+
+      history.forEach((item, index) => {
+        const div = document.createElement("div");
+        div.style = "background:#090c12; border:1px solid var(--card-border); border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:8px; cursor:pointer;";
+        div.onclick = () => toggleHistoryDetails(index);
+
+        let restText = item.restFromPrevious !== null
+          ? `<span style="color:var(--rest)">⏸️ <b>Recupero prima della serie:</b> ${item.restFromPrevious}s</span>`
+          : `<span style="color:var(--text-muted)">🏁 Prima serie della sessione</span>`;
+
+        let repDetailsHtml = "";
+        if (item.intervals && item.intervals.length > 0) {
+          let rows = item.intervals.map((sec, i) => `<span style="display:inline-block; background:#141a26; padding:3px 8px; border-radius:6px; margin:2px 4px 2px 0; border:1px solid #1f283d;">R${i + 1}➔R${i + 2}: <b style="color:var(--work)">${sec}s</b></span>`).join("");
+          repDetailsHtml = `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:6px;">⏱️ <b>Tempi tra colpi:</b><div style="margin-top:4px; display:flex; flex-wrap:wrap;">${rows}</div></div>`;
+        }
+
+        div.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">📅 ${item.date} alle ${item.time}</div>
+              <div style="font-size:1.05rem; font-weight:900; color:#fff;">Serie ${item.set} • Lavoro: ${item.duration}s</div>
+            </div>
+            <div style="font-size:1.7rem; font-weight:900; color:var(--work); font-variant-numeric:tabular-nums;">${item.reps} <span style="font-size:0.85rem; color:var(--text-muted)">rep</span></div>
+          </div>
+
+          <!-- Dettaglio espandibile con secondi e decimi tra serie e tra colpi -->
+          <div id="histDetail-${index}" style="display:none; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.1); font-size:0.85rem;">
+            <div>${restText}</div>
+            <div style="color:#00b4ff; margin-top:4px;">⚡ Cadenza media: <b>${item.avgPace}s</b> per ripetizione</div>
+            ${repDetailsHtml}
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:6px;">(Tocca per comprimere)</div>
+          </div>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function toggleHistoryDetails(index) {
+      const el = document.getElementById(`histDetail-${index}`);
+      if (el) {
+        el.style.display = el.style.display === "none" ? "block" : "none";
+      }
+    }
+
+    function clearHistory() {
+      if (confirm("Vuoi cancellare tutto lo storico delle serie registrate?")) {
+        localStorage.removeItem("gym_workout_history");
+        lastSetEndTimestamp = 0;
+        renderHistoryUI();
+      }
+    }
+
+    function openHistory() {
+      renderHistoryUI();
+      document.getElementById("historyModal").classList.add("open");
+    }
+    function closeHistory() {
+      document.getElementById("historyModal").classList.remove("open");
+    }
+
+    // ── SCHERMO INTERO A TUTTO SCHERMO ─────────────────────────
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+      }
+    }
+
+    // ── GESTIONE SOGLIA LASER ──────────────────────────────────
+    function updateLaserThreshold(val) {
+      laserThresholdMm = val;
+      document.getElementById("sliderValueText").textContent = val + " mm";
+      document.getElementById("laserCurrentMm").textContent = val + " mm";
+      localStorage.setItem("gym_laser_mm", val);
+    }
+
+    // Carica soglia salvata
+    const savedMm = localStorage.getItem("gym_laser_mm");
+    if (savedMm) {
+      document.getElementById("laserThresholdSlider").value = savedMm;
+      updateLaserThreshold(savedMm);
+    }
+
+    // ── WEB AUDIO SINTESI ZERO-LATENZA ─────────────────────────
+    let audioCtx = null;
+    function getAudioCtx() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    function soundLaser() {
+      const ctx = getAudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(1400, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(220, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.35, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.1);
+    }
+
+    function soundBeep() {
+      const ctx = getAudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(950, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.4, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.08);
+    }
+
+    function soundBell() {
+      const ctx = getAudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(1046, ctx.currentTime);
+      gain.gain.setValueAtTime(0.45, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.005, ctx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.35);
+    }
+
+    function soundClick() {
+      const ctx = getAudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(2200, ctx.currentTime);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.04);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.04);
+    }
+
+    function soundBass() {
+      const ctx = getAudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(440, ctx.currentTime);
+      gain.gain.setValueAtTime(0.45, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.14);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.14);
+    }
+
+    function playCurrentRepSound() {
+      switch (selectedSound) {
+        case "laser": soundLaser(); break;
+        case "beep":  soundBeep(); break;
+        case "bell":  soundBell(); break;
+        case "click": soundClick(); break;
+        case "bass":  soundBass(); break;
+      }
+    }
+
+    function playCountdownTick(freq = 660) {
+      const ctx = getAudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      gain.gain.setValueAtTime(0.35, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.09);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.09);
+    }
+
+    function playPhaseAlarm(isWork) {
+      const ctx = getAudioCtx();
+      const freqs = isWork ? [587, 880, 1174] : [880, 659, 440];
+      freqs.forEach((f, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(f, ctx.currentTime + i * 0.1);
+        gain.gain.setValueAtTime(0.5, ctx.currentTime + i * 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.1 + 0.28);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + i * 0.1);
+        osc.stop(ctx.currentTime + i * 0.1 + 0.28);
+      });
+    }
+
+    function speakText(text) {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = "it-IT";
+      utter.rate = 1.15;
+      window.speechSynthesis.speak(utter);
+    }
+
+    // ── GESTIONE RIPETIZIONE ───────────────────────────────────
+    // ── GESTIONE RIPETIZIONE ───────────────────────────────────
+    let lastRepPerfTimestamp = 0;
+
+    function triggerRep() {
+      const nowPerf = performance.now();
+      // Antirimbalzo software rigoroso: ignora trigger duplicati o troppo ravvicinati (< 400ms)
+      if (nowPerf - lastRepPerfTimestamp < 400) {
+        return;
+      }
+      lastRepPerfTimestamp = nowPerf;
+
+      if (repsInSet === 0 && setStartTimestamp === 0) {
+        setStartTimestamp = Date.now();
+      }
+      currentSetRepTimings.push(nowPerf);
+
+      repsInSet++;
+      document.getElementById("repDisplay").textContent = repsInSet;
+
+      // Aggiorna indicatore segnale attivo e avvia watchdog
+      recordSignalReceived();
+
+      // Animazione visuale
+      const card = document.getElementById("repCard");
+      card.classList.add("hit");
+      setTimeout(() => card.classList.remove("hit"), 150);
+
+      // Suono sempre presente!
+      playCurrentRepSound();
+
+      // Voce ripetizioni opzionale
+      if (document.getElementById("voiceRepsToggle").checked) {
+        speakText(repsInSet.toString());
+      }
+
+      // Rinnova il blocco dello spegnimento schermo ad ogni colpo
+      requestWakeLock();
+    }
+
+    // ── GESTIONE STATO SEGNALE BLE CON WATCHDOG ATTIVITÀ ────────
+    let lastSignalTime = 0;
+    let signalWatchdog = null;
+
+    function recordSignalReceived() {
+      lastSignalTime = Date.now();
+      updateSignalStatusUI();
+
+      if (!signalWatchdog) {
+        signalWatchdog = setInterval(updateSignalStatusUI, 1000);
+      }
+    }
+
+    function updateSignalStatusUI() {
+      const badge = document.getElementById("connBadge");
+      const connIcon = document.getElementById("connIcon");
+      const connText = document.getElementById("connText");
+      if (!badge || !connText) return;
+
+      if (lastSignalTime === 0) {
+        badge.className = "connection-badge ready";
+        connIcon.textContent = "📶";
+        connText.textContent = "IN ATTESA DI SEGNALE";
+        return;
+      }
+
+      const elapsedSec = Math.floor((Date.now() - lastSignalTime) / 1000);
+
+      if (elapsedSec <= 45) {
+        // Segnale recente: connesso e attivo
+        badge.className = "connection-badge connected";
+        connIcon.textContent = "🟢";
+        connText.textContent = elapsedSec === 0 ? "ATTIVO ORA" : `ATTIVO (${elapsedSec}s fa)`;
+      } else if (elapsedSec < 120) {
+        // Tra 45s e 2 minuti: pausa tra serie / standby
+        badge.className = "connection-badge ready";
+        connIcon.textContent = "🟡";
+        connText.textContent = `PAUSA (${elapsedSec}s fa)`;
+      } else {
+        // Oltre 2 minuti senza segnale dal laser: sensore inattivo o spento
+        badge.className = "connection-badge";
+        connIcon.textContent = "⚪";
+        connText.textContent = "STANDBY / SPENTO";
+      }
+    }
+
+    function showBleInfoAlert() {
+      alert("ℹ️ STATO GYMCOUNTER BLE:\n\n• Il dispositivo è abbinato come Tastiera Bluetooth ad Android.\n• Per motivi di privacy del sistema operativo, il browser rileva il segnale quando il laser registra un passaggio (+).\n• Se spegni il sensore, dopo 45s l'app segnala lo standby/spegnimento.\n\n👉 Passa una mano davanti al sensore per attivarlo subito!");
+    }
+
+    // ── TASTIERA BLE (CROSS-PLATFORM: ANDROID + APPLE iOS) ────
+    function handleKeyTrigger(e) {
+      if (e.key === triggerKey || e.code === "NumpadAdd" || (triggerKey === "+" && (e.key === "=" || e.key === "+"))) {
+        e.preventDefault();
+        e.stopPropagation();
+        getAudioCtx();
+        triggerRep();
+      }
+    }
+
+    // Unico listener su window (capture phase per prevenire doppi eventi di bubbling)
+    window.addEventListener("keydown", handleKeyTrigger, true);
+
+    // Solo per Apple iOS: Safari richiede un input attivo per ricevere i tasti da tastiere Bluetooth.
+    // Su Android Chrome NON serve e NON deve mai essere attivato per non bloccare i menu a tendina!
+    const isIosDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+    function keepIosKeyCapturerActive(e) {
+      if (!isIosDevice) return; // Su Android Chrome NON rubare mai il focus!
+
+      // Se il modal impostazioni o storico è aperto, lascia interagire l'utente liberamente
+      const settingsModal = document.getElementById("settingsModal");
+      const historyModal = document.getElementById("historyModal");
+      if ((settingsModal && settingsModal.classList.contains("open")) || 
+          (historyModal && historyModal.classList.contains("open"))) {
+        return;
+      }
+
+      // Non rubare il focus se si tocca un elemento interattivo (select, input, bottoni, opzioni)
+      if (e && e.target) {
+        const tag = e.target.tagName;
+        if (tag === 'SELECT' || tag === 'INPUT' || tag === 'BUTTON' || tag === 'OPTION' || tag === 'LABEL') {
+          return;
+        }
+      }
+
+      const capturer = document.getElementById("iosKeyCapturer");
+      if (capturer && document.activeElement !== capturer) {
+        capturer.focus();
+      }
+    }
+
+    if (isIosDevice) {
+      window.addEventListener("touchstart", keepIosKeyCapturerActive, { passive: true });
+      window.addEventListener("click", keepIosKeyCapturerActive);
+    }
+
+    // ── TIMER CICLICO (LAVORO / RECUPERO) ──────────────────────
+    function updateDisplayTime() {
+      const min = Math.floor(timeLeft / 60);
+      const sec = timeLeft % 60;
+      document.getElementById("timeDisplay").textContent =
+        `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+    }
+
+    function updateTimes() {
+      workDuration = parseInt(document.getElementById("workSeconds").value) || 40;
+      restDuration = parseInt(document.getElementById("restSeconds").value) || 60;
+      document.getElementById("infoWork").textContent = workDuration + "s";
+      document.getElementById("infoRest").textContent = restDuration + "s";
+      if (currentPhase === "idle") {
+        timeLeft = workDuration;
+        updateDisplayTime();
+      }
+    }
+
+    function toggleIntervalTimer() {
+      getAudioCtx();
+      requestWakeLock();
+
+      if (currentPhase === "idle") {
+        startWorkPhase();
+      } else {
+        pauseTimer();
+      }
+    }
+
+    function startWorkPhase() {
+      currentPhase = "work";
+      timeLeft = workDuration;
+      setStartTimestamp = Date.now();
+      currentSetRepTimings = [];
+      repsInSet = 0;
+      document.getElementById("repDisplay").textContent = "0";
+      updateDisplayTime();
+
+      const card = document.getElementById("intervalCard");
+      card.className = "interval-card work-phase";
+      document.getElementById("phaseBadge").textContent = "💪 ESERCIZIO";
+      document.getElementById("startBtn").className = "btn btn-pause";
+      document.getElementById("startIcon").textContent = "⏸️";
+      document.getElementById("startText").textContent = "PAUSA";
+
+      playPhaseAlarm(true);
+      startTicking();
+      requestWakeLock();
+    }
+
+    function startRestPhase() {
+      currentPhase = "rest";
+      timeLeft = restDuration;
+      updateDisplayTime();
+
+      const card = document.getElementById("intervalCard");
+      card.className = "interval-card rest-phase";
+      document.getElementById("phaseBadge").textContent = "⏸️ RECUPERO";
+
+      playPhaseAlarm(false);
+      startTicking();
+      requestWakeLock();
+    }
+
+    function startTicking() {
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        updateDisplayTime();
+
+        // FEED SONORO E VOCALE PROGRAMMABILE (in base a countdownStartSec)
+        if (timeLeft <= countdownStartSec && timeLeft > 0) {
+          playCountdownTick(timeLeft === 1 ? 950 : 660); // Suono sempre attivo
+          if (document.getElementById("voiceCountdownToggle").checked) {
+            speakText(timeLeft.toString()); // Voce se abilitata
+          }
+        }
+
+        // CAMBIO FASE A 0
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+
+          if (currentPhase === "work") {
+            // Salva la serie terminata nello storico permanente!
+            saveSetToHistory(repsInSet, workDuration);
+            startRestPhase();
+          } else if (currentPhase === "rest") {
+            setNumber++;
+            repsInSet = 0;
+            document.getElementById("repDisplay").textContent = "0";
+            document.getElementById("currentSet").textContent = setNumber;
+            startWorkPhase();
+          }
+        }
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      clearInterval(timerInterval);
+      // Se fermi mentre stavi lavorando e hai fatto reps, salvale nello storico!
+      if (currentPhase === "work" && repsInSet > 0) {
+        saveSetToHistory(repsInSet, workDuration - timeLeft);
+      }
+
+      currentPhase = "idle";
+      document.getElementById("startBtn").className = "btn btn-start";
+      document.getElementById("startIcon").textContent = "▶️";
+      document.getElementById("startText").textContent = "RIPRENDI";
+      document.getElementById("phaseBadge").textContent = "IN PAUSA";
+      document.getElementById("intervalCard").className = "interval-card";
+    }
+
+    function resetAll() {
+      clearInterval(timerInterval);
+      if (currentPhase === "work" && repsInSet > 0) {
+        saveSetToHistory(repsInSet, workDuration - timeLeft);
+      }
+
+      currentPhase = "idle";
+      repsInSet = 0;
+      setNumber = 1;
+      timeLeft = workDuration;
+      currentSetRepTimings = [];
+      setStartTimestamp = 0;
+      updateDisplayTime();
+
+      document.getElementById("repDisplay").textContent = "0";
+      document.getElementById("currentSet").textContent = "1";
+      document.getElementById("phaseBadge").textContent = "PRONTO";
+      document.getElementById("intervalCard").className = "interval-card";
+
+      document.getElementById("startBtn").className = "btn btn-start";
+      document.getElementById("startIcon").textContent = "▶️";
+      document.getElementById("startText").textContent = "AVVIA TIMER";
+    }
+
+    // Modal Impostazioni
+    function openSettings() {
+      document.getElementById("settingsModal").classList.add("open");
+    }
+
+    function closeSettings() {
+      document.getElementById("settingsModal").classList.remove("open");
+    }
+
+    // Apertura contestuale con scorrimento e animazione sulla sezione cliccata
+    function openSettingsSection(section) {
+      openSettings();
+      setTimeout(() => {
+        let scrollTarget = null;
+        let highlightEls = [];
+
+        if (section === 'timer') {
+          scrollTarget = document.getElementById("sec-timer");
+          highlightEls = [scrollTarget];
+        } else if (section === 'reps') {
+          scrollTarget = document.getElementById("sec-laser");
+          highlightEls = [
+            document.getElementById("sec-laser"),
+            document.getElementById("sec-sound")
+          ];
+        }
+
+        if (scrollTarget) {
+          scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        highlightEls.forEach(el => {
+          if (el) {
+            el.classList.remove("section-highlight");
+            void el.offsetWidth; // Riavvia animazione CSS
+            el.classList.add("section-highlight");
+            setTimeout(() => el.classList.remove("section-highlight"), 1600);
+          }
+        });
+      }, 120);
+    }
+
+    // ── APERTURA AUTOMATICA A TUTTO SCHERMO (FULLSCREEN) ─────────
+    function autoEnterFullscreen() {
+      if (!document.fullscreenElement) {
+        const el = document.documentElement;
+        const rfs = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+        if (rfs) {
+          rfs.call(el).catch(() => {});
+        }
+      }
+    }
+
+    // Tentativo immediato all'avvio (funziona se aperta da schermata Home / PWA)
+    document.addEventListener("DOMContentLoaded", autoEnterFullscreen);
+    window.addEventListener("load", autoEnterFullscreen);
+
+    // E al primissimo tocco/click ovunque sullo schermo (per policy di sicurezza di Chrome)
+    window.addEventListener("touchstart", autoEnterFullscreen, { once: true, passive: true });
+    window.addEventListener("click", autoEnterFullscreen, { once: true });
+
+    // Gestione Eventi e Wake Lock
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === 'visible' && keepDisplayAwake) {
+        requestWakeLock();
+      }
+    });
+
+    window.addEventListener("touchstart", () => {
+      getAudioCtx();
+      requestWakeLock();
+    }, { passive: true });
+
+    window.addEventListener("click", () => {
+      getAudioCtx();
+      requestWakeLock();
+    });
+
+    updateDisplayTime();
+  </script>
+</body>
+</html>
