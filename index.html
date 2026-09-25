@@ -1072,8 +1072,8 @@
     }
 
     // ── GESTIONE SOGLIA LASER & SINCRONIZZAZIONE BLE GATT ──────────
-    const BLE_SERVICE_UUID = '0000ffe0-0000-1000-8000-00805f9b34fb';
-    const BLE_CHAR_UUID    = '0000ffe1-0000-1000-8000-00805f9b34fb';
+    const BLE_SERVICE_UUID = '19b10000-e8f2-537e-4f6c-d104768a1214';
+    const BLE_CHAR_UUID    = '19b10001-e8f2-537e-4f6c-d104768a1214';
     let bleDevice = null;
     let bleSogliaChar = null;
     let bleSyncTimer = null;
@@ -1116,10 +1116,7 @@
 
         bleDevice = await navigator.bluetooth.requestDevice({
           filters: [{ name: 'GymCounter' }],
-          optionalServices: [
-            '0000ffe0-0000-1000-8000-00805f9b34fb',
-            0xffe0
-          ]
+          optionalServices: [BLE_SERVICE_UUID]
         });
 
         deviceSelected = true;
@@ -1134,52 +1131,11 @@
           new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout connessione GATT (10s)")), 10000))
         ]);
 
-        updateBleSyncStatus("2/3 Lettura servizi...", "#00b4ff");
-        let service = null;
-        try {
-          service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
-        } catch (e1) {
-          try {
-            service = await server.getPrimaryService(0xffe0);
-          } catch (e2) {
-            // Cerca tra tutti i servizi disponibili
-            const services = await server.getPrimaryServices();
-            for (const s of services) {
-              if (s.uuid.toLowerCase().includes("ffe0")) {
-                service = s;
-                break;
-              }
-            }
-          }
-        }
-
-        if (!service) {
-          throw new Error("Servizio di configurazione FFE0 non trovato sul dispositivo.");
-        }
+        updateBleSyncStatus("2/3 Apertura servizio...", "#00b4ff");
+        const service = await server.getPrimaryService(BLE_SERVICE_UUID);
 
         updateBleSyncStatus("3/3 Lettura caratteristica...", "#00b4ff");
-        let targetChar = null;
-        try {
-          targetChar = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
-        } catch (e3) {
-          try {
-            targetChar = await service.getCharacteristic(0xffe1);
-          } catch (e4) {
-            const chars = await service.getCharacteristics();
-            for (const c of chars) {
-              if (c.uuid.toLowerCase().includes("ffe1")) {
-                targetChar = c;
-                break;
-              }
-            }
-          }
-        }
-
-        if (!targetChar) {
-          throw new Error("Caratteristica soglia FFE1 non trovata.");
-        }
-
-        bleSogliaChar = targetChar;
+        bleSogliaChar = await service.getCharacteristic(BLE_CHAR_UUID);
 
         // Legge la distanza memorizzata al momento sul sensore
         try {
