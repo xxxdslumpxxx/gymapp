@@ -1109,21 +1109,77 @@
         return;
       }
 
+      let deviceSelected = false;
       try {
         updateBleSyncStatus("Ricerca 'GymCounter'...", "#00b4ff");
         updateSyncButtons("⌛ Ricerca...", "#00b4ff", "#00b4ff");
 
         bleDevice = await navigator.bluetooth.requestDevice({
           filters: [{ name: 'GymCounter' }],
-          optionalServices: [BLE_SERVICE_UUID]
+          optionalServices: [
+            '0000ffe0-0000-1000-8000-00805f9b34fb',
+            0xffe0
+          ]
         });
 
+        deviceSelected = true;
         bleDevice.addEventListener('gattserverdisconnected', onBleCustomDisconnected);
 
-        updateBleSyncStatus("Connessione in corso...", "#00b4ff");
-        const server = await bleDevice.gatt.connect();
-        const service = await server.getPrimaryService(BLE_SERVICE_UUID);
-        bleSogliaChar = await service.getCharacteristic(BLE_CHAR_UUID);
+        updateBleSyncStatus("1/3 Connessione GATT...", "#00b4ff");
+        updateSyncButtons("⌛ Connessione...", "#00b4ff", "#00b4ff");
+
+        // Timeout di sicurezza per evitare blocchi infiniti
+        const server = await Promise.race([
+          bleDevice.gatt.connect(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout connessione GATT (10s)")), 10000))
+        ]);
+
+        updateBleSyncStatus("2/3 Lettura servizi...", "#00b4ff");
+        let service = null;
+        try {
+          service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
+        } catch (e1) {
+          try {
+            service = await server.getPrimaryService(0xffe0);
+          } catch (e2) {
+            // Cerca tra tutti i servizi disponibili
+            const services = await server.getPrimaryServices();
+            for (const s of services) {
+              if (s.uuid.toLowerCase().includes("ffe0")) {
+                service = s;
+                break;
+              }
+            }
+          }
+        }
+
+        if (!service) {
+          throw new Error("Servizio di configurazione FFE0 non trovato sul dispositivo.");
+        }
+
+        updateBleSyncStatus("3/3 Lettura caratteristica...", "#00b4ff");
+        let targetChar = null;
+        try {
+          targetChar = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
+        } catch (e3) {
+          try {
+            targetChar = await service.getCharacteristic(0xffe1);
+          } catch (e4) {
+            const chars = await service.getCharacteristics();
+            for (const c of chars) {
+              if (c.uuid.toLowerCase().includes("ffe1")) {
+                targetChar = c;
+                break;
+              }
+            }
+          }
+        }
+
+        if (!targetChar) {
+          throw new Error("Caratteristica soglia FFE1 non trovata.");
+        }
+
+        bleSogliaChar = targetChar;
 
         // Legge la distanza memorizzata al momento sul sensore
         try {
@@ -1145,15 +1201,20 @@
         updateSyncButtons("🟢 Connesso", "var(--work)", "var(--work)");
         updateBleSyncStatus(`🟢 Connesso! Distanza sensore: ${laserThresholdMm} mm`, "var(--work)");
 
-        // Se l'utente desidera inviare il valore dello slider
-        sendLaserThresholdToBle(laserThresholdMm);
+        // Invia subito la distanza corrente per confermare il collegamento
+        await sendLaserThresholdToBle(laserThresholdMm);
+
       } catch (err) {
         console.error("BLE Connect Error:", err);
-        updateSyncButtons("📡 Sincronizza Sensore", "#0096ff", "#00b4ff");
-        if (err.name !== 'NotFoundError') {
-          updateBleSyncStatus("Errore: " + err.message, "var(--danger)");
+        updateSyncButtons("📡 Sincronizza", "#0096ff", "#00b4ff");
+
+        if (!deviceSelected && err.name === 'NotFoundError') {
+          // L'utente ha chiuso il popup o premuto Annulla
+          updateBleSyncStatus("Selezione annullata.", "var(--text-muted)");
         } else {
-          updateBleSyncStatus("Connessione annullata.", "var(--text-muted)");
+          // Si è verificato un errore reale dopo aver cliccato GymCounter
+          updateBleSyncStatus("Errore: " + err.message, "var(--danger)");
+          alert("Dettaglio connessione BLE:\n" + err.name + ": " + err.message + "\n\n💡 Se hai appena associato il chip, prova a risollecitare 'Sincronizza' una seconda volta!");
         }
       }
     }
@@ -1161,7 +1222,7 @@
     function onBleCustomDisconnected() {
       bleSogliaChar = null;
       updateBleSyncStatus("Sensore disconnesso.", "var(--text-muted)");
-      updateSyncButtons("📡 Sincronizza Sensore", "#0096ff", "#00b4ff");
+      updateSyncButtons("📡 Sincronizza", "#0096ff", "#00b4ff");
     }
 
     async function sendLaserThresholdToBle(val) {
